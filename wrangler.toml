@@ -1,0 +1,29 @@
+name = "vending-status-dashboard"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# 经 Service Bindings 探测同账号 6 个 Worker（同账号不能用 workers.dev 公网 URL 互 fetch，会被内部路由吞成 404）。
+# 新增/下线被监控服务 → 同步改这里的 [[services]] 与 src/index.ts 的 SERVICES。
+[[services]]
+binding = "UVM"
+service = "ucp-vending-machine"
+
+[[services]]
+binding = "VSC"
+service = "vending-supply-chain"
+
+[[services]]
+binding = "PAY"
+service = "vending-payment-sandbox"
+
+[[services]]
+binding = "WELFARE"
+service = "vending-welfare-service"
+
+[[services]]
+binding = "IDENTITY"
+service = "vending-identity-service"
+
+[[services]]
+binding = "NOTIFY"
+service = "vending-notify-gateway"
