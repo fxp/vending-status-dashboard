@@ -54,6 +54,9 @@ jobs:
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # scoped token 无法自动枚举账号（/memberships → code 10000），显式给账号 ID。
+          # 非敏感（无 token 无用）；账号变更或换人 fork 时改这里。
+          CLOUDFLARE_ACCOUNT_ID: "0356d59ccdcff356bf3bbdb580bbaa60"
       - name: Smoke test (/health)
         if: env.SKIP_DEPLOY != 'true'
         run: |
