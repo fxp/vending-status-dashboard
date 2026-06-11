@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── 类型检查（每次 push/PR；无需任何 secret）──────────────────────────────────
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install            # 仓内无 package-lock → 用 install 而非 ci
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+  # ── 部署到 Cloudflare（仅 push 到 main，typecheck 通过后）────────────────────
+  #    缺 CLOUDFLARE_API_TOKEN 时优雅跳过（不报红），打印启用命令。
+  deploy:
+    name: Deploy → Cloudflare
+    needs: typecheck
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-${{ github.event.repository.name }}
+      cancel-in-progress: false     # 永不取消进行中的部署
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard — 需要 CLOUDFLARE_API_TOKEN
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::warning title=CD 未启用::CLOUDFLARE_API_TOKEN 未设置，跳过部署。启用：gh secret set CLOUDFLARE_API_TOKEN -R ${{ github.repository }}"
+            echo "SKIP_DEPLOY=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: env.SKIP_DEPLOY != 'true'
+        with:
+          node-version: 20
+      - name: Install
+        if: env.SKIP_DEPLOY != 'true'
+        run: npm install
+      - name: Deploy
+        if: env.SKIP_DEPLOY != 'true'
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Smoke test (/health)
+        if: env.SKIP_DEPLOY != 'true'
+        run: |
+          URL="https://${{ github.event.repository.name }}.fxp007.workers.dev/health"
+          echo "probe $URL"
+          HEALTH=$(curl -sf --retry 3 --retry-delay 2 "$URL")
+          echo "$HEALTH"
+          echo "$HEALTH" | grep -q '"ok":true' || (echo "smoke failed" && exit 1)
