@@ -2,8 +2,17 @@ name = "vending-status-dashboard"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+# 每分钟探测并落 D1（uptime 历史 + 掉线告警）。CF cron 最小粒度=1 分钟。
+[triggers]
+crons = ["* * * * *"]
+
+# 探测历史 / 告警状态（独立于 harness 核心库 vend-harness）。
+[[d1_databases]]
+binding = "DB"
+database_name = "vending-status-history"
+database_id = "8cfc8836-8a8b-4122-ad7d-8e2c5298309c"
+
 # 经 Service Bindings 探测同账号 6 个 Worker（同账号不能用 workers.dev 公网 URL 互 fetch，会被内部路由吞成 404）。
-# 新增/下线被监控服务 → 同步改这里的 [[services]] 与 src/index.ts 的 SERVICES。
 [[services]]
 binding = "UVM"
 service = "ucp-vending-machine"
@@ -27,3 +36,6 @@ service = "vending-identity-service"
 [[services]]
 binding = "NOTIFY"
 service = "vending-notify-gateway"
+
+# 告警通道（飞书自定义机器人 webhook）。设置：wrangler secret put FEISHU_WEBHOOK_URL
+# 未设则告警静默 no-op（看板/历史不受影响）。
